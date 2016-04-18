@@ -1,269 +1,162 @@
 'use strict';
 
 /**
- * Serverless Test Plugin
+ * Serverless Plugin Boilerplate
+ * - Useful example/starter code for writing a plugin for the Serverless Framework.
+ * - In a plugin, you can:
+ *    - Manipulate Serverless classes
+ *    - Create a Custom Action that can be called via the CLI or programmatically via a function handler.
+ *    - Overwrite a Core Action that is included by default in the Serverless Framework.
+ *    - Add a hook that fires before or after a Core Action or a Custom Action
+ *    - All of the above at the same time :)
+ *
+ * - Setup:
+ *    - Make a Serverless Project dedicated for plugin development, or use an existing Serverless Project
+ *    - Make a "plugins" folder in the root of your Project and copy this codebase into it. Title it your custom plugin name with the suffix "-dev", like "myplugin-dev"
+ *
  */
 
-module.exports = function(ServerlessPlugin, serverlessPath) { // Always pass in the ServerlessPlugin Class
+const path  = require('path'),
+  fs        = require('fs'),
+  BbPromise = require('bluebird'); // Serverless uses Bluebird Promises and we recommend you do to because they provide more than your average Promise :)
 
-	const path      = require('path'),
-		fs          = require('fs'),
-		BbPromise   = require('bluebird'),
-		chalk       = require('chalk'),
-		SError      = require(path.join(serverlessPath, 'ServerlessError')),
-		SUtils      = require(path.join(serverlessPath, 'utils')),
-		SCli        = require( path.join( serverlessPath, 'utils', 'cli' ) ),
-		context     = require( path.join( serverlessPath, 'utils', 'context' ) ),
-		JUnitWriter = require("junitwriter"),
-		intercept   = require("intercept-stdout");
+module.exports = function(S) { // Always pass in the ServerlessPlugin Class
 
-	/**
-	 * ServerlessPluginBoierplate
-	 */
+  /**
+   * Adding/Manipulating Serverless classes
+   * - You can add or manipulate Serverless classes like this
+   */
 
-	class ServerlessTestPlugin extends ServerlessPlugin {
+  S.classes.Project.newStaticMethod     = function() { console.log("A new method!"); };
+  S.classes.Project.prototype.newMethod = function() { S.classes.Project.newStaticMethod(); };
 
-		/**
-		 * Constructor
-		 * - Keep this and don't touch it unless you know what you're doing.
-		 */
+  /**
+   * Extending the Plugin Class
+   * - Here is how you can add custom Actions and Hooks to Serverless.
+   * - This class is only required if you want to add Actions and Hooks.
+   */
 
-		constructor(S) {
-			super(S);
-		}
+  class PluginBoilerplate extends S.classes.Plugin {
 
-		/**
-		 * Define your plugins name
-		 * - We recommend adding prefixing your personal domain to the name so people know the plugin author
-		 */
+    /**
+     * Constructor
+     * - Keep this and don't touch it unless you know what you're doing.
+     */
 
-		static getName() {
-			return 'com.serverless.' + ServerlessTestPlugin.name;
-		}
+    constructor() {
+      super();
+      this.name = 'myPlugin'; // Define your plugin's name
+    }
 
-		/**
-		 * Register Actions
-		 * - If you would like to register a Custom Action or overwrite a Core Serverless Action, add this function.
-		 * - If you would like your Action to be used programatically, include a "handler" which can be called in code.
-		 * - If you would like your Action to be used via the CLI, include a "description", "context", "action" and any options you would like to offer.
-		 * - Your custom Action can be called programatically and via CLI, as in the example provided below
-		 */
+    /**
+     * Register Actions
+     * - If you would like to register a Custom Action or overwrite a Core Serverless Action, add this function.
+     * - If you would like your Action to be used programatically, include a "handler" which can be called in code.
+     * - If you would like your Action to be used via the CLI, include a "description", "context", "action" and any options you would like to offer.
+     * - Your custom Action can be called programatically and via CLI, as in the example provided below
+     */
 
-		registerActions() {
+    registerActions() {
 
-			this.S.addAction(this._runFunctionTest.bind(this), {
-				handler:       'runFunctionTest',
-				description:   'Run tests on a given function',
-				context:       'function',
-				contextAction: 'test',
-				options:       [{ // These must be specified in the CLI like this "-option true" or "-o true"
-					option:      'all',
-					shortcut:    'a',
-					description: 'Test all functions'
-				},{
-					option:      'out',
-					shortcut:    'o',
-					description: 'JUnit output file'
-				}],
-				parameters: [{ // Use paths when you multiple values need to be input (like an array).  Input looks like this: "serverless custom run module1/function1 module1/function2 module1/function3.  Serverless will automatically turn this into an array and attach it to evt.options within your plugin
-					parameter: 'paths',
-					description: 'One or multiple paths to your function',
-					position: '0->' // Can be: 0, 0-2, 0->  This tells Serverless which params are which.  3-> Means that number and infinite values after it.
-				}]
-			});
+      S.addAction(this._runTests.bind(this), {
+        handler:       'customAction',
+        description:   'A custom action from a custom plugin',
+        context:       'test',
+        contextAction: 'integration',
+        options:       [],
+        parameters: []
+      });
 
-			return BbPromise.resolve();
-		}
+      return BbPromise.resolve();
+    }
 
-		/**
-		 * Register Hooks
-		 * - If you would like to register hooks (i.e., functions) that fire before or after a core Serverless Action or your Custom Action, include this function.
-		 * - Make sure to identify the Action you want to add a hook for and put either "pre" or "post" to describe when it should happen.
-		 */
+    /**
+     * Register Hooks
+     * - If you would like to register hooks (i.e., functions) that fire before or after a core Serverless Action or your Custom Action, include this function.
+     * - Make sure to identify the Action you want to add a hook for and put either "pre" or "post" to describe when it should happen.
+     */
 
-		registerHooks() {
-			return BbPromise.resolve();
-		}
+    registerHooks() {
+      return BbPromise.resolve();
+    }
 
-		/**
-		 * Custom Action Example
-		 * - Here is an example of a Custom Action.  Include this and modify it if you would like to write your own Custom Action for the Serverless Framework.
-		 * - Be sure to ALWAYS accept and return the "evt" object, or you will break the entire flow.
-		 * - The "evt" object contains Action-specific data.  You can add custom data to it, but if you change any data it will affect subsequent Actions and Hooks.
-		 * - You can also access other Project-specific data @ this.S Again, if you mess with data on this object, it could break everything, so make sure you know what you're doing ;)
-		 */
+    /**
+     * Custom Action Example
+     * - Here is an example of a Custom Action.  Include this and modify it if you would like to write your own Custom Action for the Serverless Framework.
+     * - Be sure to ALWAYS accept and return the "evt" object, or you will break the entire flow.
+     * - The "evt" object contains Action-specific data.  You can add custom data to it, but if you change any data it will affect subsequent Actions and Hooks.
+     * - You can also access other Project-specific data @ this.S Again, if you mess with data on this object, it could break everything, so make sure you know what you're doing ;)
+     */
 
-		_runFunctionTest(evt) {
+    _runTests(evt) {
 
-			let _this = this;
+      let _this = this;
 
-			return new BbPromise(function (resolve, reject) {
+      return new BbPromise(function (resolve, reject) {
 
-				// Set an environment variable the invoked functions can check for
-				process.env.SERVERLESS_TEST = true;
+        // console.log(evt)           // Contains Action Specific data
+        // console.log(_this.S)       // Contains Project Specific data
+        // console.log(_this.S.state) // Contains tons of useful methods for you to use in your plugin.  It's the official API for plugin developers.
 
-				// Prepare result object
-				evt.data.result = { status: false };
+        console.log('-------------------');
+        console.log('YOU JUST RAN YOUR CUSTOM ACTION, NICE!');
+        console.log('-------------------');
 
-				// Instantiate Classes
-				let functions;
-				if (evt.options.all) {
-					// Load all functions
-					functions = _this.S.state.getFunctions();
-				}
-				else if (evt.options.paths) {
-					// Load individual functions as specified in command line
-					functions = _this.S.state.getFunctions({ paths: evt.options.paths });
-				}
+        console.log("env", process.env, evt, S);
 
-				if (!functions || functions.length === 0) {
-					return BbPromise.reject(new SError(
-							"You need to specify either a function path or --all to test all functions",
-							SError.errorCodes.INVALID_PROJECT_SERVERLESS
-					));
-				}
+        return resolve(evt);
 
-				// Iterate all functions, execute their handler and
-				// write the results into a JUnit file...
-				let junitWriter = new JUnitWriter();
-				let count = 0, succeeded = 0, failed = 0;
-				BbPromise.each(functions, function(functionData) {
-					let functionTestSuite = junitWriter.addTestsuite(functionData._config.sPath);
-					count++;
+      });
+    }
 
-					if (functionData.runtime === "nodejs") {
-						// Load function file & handler
-						let functionFile    = functionData.handler.split('/').pop().split('.')[0];
-						let functionHandler = functionData.handler.split('/').pop().split('.')[1];
-						let functionPath    = path.join(_this.S.config.projectPath, functionData._config.sPath);
-						functionFile        = path.join(functionPath, (functionFile + '.js'));
+    /**
+     * Your Custom PRE Hook
+     * - Here is an example of a Custom PRE Hook.  Include this and modify it if you would like to write your a hook that fires BEFORE an Action.
+     * - Be sure to ALWAYS accept and return the "evt" object, or you will break the entire flow.
+     * - The "evt" object contains Action-specific data.  You can add custom data to it, but if you change any data it will affect subsequent Actions and Hooks.
+     * - You can also access other Project-specific data @ this.S Again, if you mess with data on this object, it could break everything, so make sure you know what you're doing ;)
+     */
 
-						// Fire function
-						let eventFile     = (functionData.custom.test ? 
-								functionData.custom.test.event : false) || "event.json";
-						let functionEvent = SUtils.readAndParseJsonSync(path.join(functionPath, eventFile));
+    _hookPre(evt) {
 
-						// TODO Should we skip a function that's explicitly specified via command line option?
-						if (functionData.custom.test && functionData.custom.test.skip) {
-							SCli.log(`Skipping ${functionData._config.sPath}`);
-							functionTestSuite.addTestcase("skipped", functionData._config.sPath);
-							functionTestSuite.setSkipped(true);
-							return; // skip this function
-						}
+      let _this = this;
 
-						return new BbPromise(function(resolve) {
-							try {
-								// Load the handler code
-								functionHandler = require(functionFile)[functionHandler];
-								if (!functionHandler) {
-									let msg = `Handler function ${functionData.handler} not found`;
-									SCli.log(chalk.bold(msg));
-									evt.data.result.status   = 'error';
-									evt.data.result.response = msg;
-									return resolve();
-								}
+      return new BbPromise(function (resolve, reject) {
 
-								// Okay, let's go and execute the handler
-								// We intercept all stdout from the function and dump
-								// it into our test results instead.
-								SCli.log(`Testing ${functionData._config.sPath}...`);
-								let testCase = functionTestSuite.addTestcase("should succeed", functionData._config.sPath);
-								let capturedText = "";
-								let unhookIntercept = intercept(function(txt) {
-									capturedText += txt;
-								});
-		
-								let startTime = Date.now();
-								functionHandler(functionEvent, context(functionData.name, function (err, result) {
+        console.log('-------------------');
+        console.log('YOUR SERVERLESS PLUGIN\'S CUSTOM "PRE" HOOK HAS RUN BEFORE "FunctionRun"');
+        console.log('-------------------');
 
-									let duration = (Date.now() - startTime) / 1000;
-									unhookIntercept(); // stop intercepting stdout
+        return resolve(evt);
 
-									testCase.setSystemOut(capturedText);
-									testCase.setTime(duration);
+      });
+    }
 
-									// Show error
-									if (err) {
-										testCase.addFailure(err.toString(), "Failed");
+    /**
+     * Your Custom POST Hook
+     * - Here is an example of a Custom POST Hook.  Include this and modify it if you would like to write your a hook that fires AFTER an Action.
+     * - Be sure to ALWAYS accept and return the "evt" object, or you will break the entire flow.
+     * - The "evt" object contains Action-specific data.  You can add custom data to it, but if you change any data it will affect subsequent Actions and Hooks.
+     * - You can also access other Project-specific data @ this.S Again, if you mess with data on this object, it could break everything, so make sure you know what you're doing ;)
+     */
 
-										// Done with errors.
-										SCli.log(chalk.bgRed.white(" ERROR ") + " " +
-												chalk.red(err.toString()));
-										failed++;
-									}
-									else if (duration > functionData.timeout) {
-										let msg = `Timeout of ${functionData.timeout} seconds exceeded`;
-										testCase.addFailure(msg, "Timeout");
+    _hookPost(evt) {
 
-										SCli.log(chalk.bgMagenta.white(" TIMEOUT ") + " " + 
-												chalk.magenta(msg));
-										failed++;
-									}
-									else {
-										// Done.
-										SCli.log(chalk.green("Success!"));
-										succeeded++;
-									}
+      let _this = this;
 
-									return resolve();
-								}));
-							}
-							catch (err) {
+      return new BbPromise(function (resolve, reject) {
 
-								SCli.log("-----------------");
+        console.log('-------------------');
+        console.log('YOUR SERVERLESS PLUGIN\'S CUSTOM "POST" HOOK HAS RUN AFTER "FunctionRun"');
+        console.log('-------------------');
 
-								SCli.log(chalk.bold("Failed to Run Handler - This Error Was Thrown:"));
-								SCli.log(err);
-								evt.data.result.status   = 'error';
-								evt.data.result.response = err.message;
-								return resolve();
-							}
-						});
-					}
-					else {
-						SCli.log("Skipping " + functionData._config.sPath);
-						functionTestSuite.setSkipped(true);
-					}
-				}).then(function() {
+        return resolve(evt);
 
-					SCli.log("-----------------");
+      });
+    }
+  }
 
-					// All done. Print a summary and write the test results
-					SCli.log("Tests completed: " + 
-							chalk.green(String(succeeded) + " succeeded") + " / " +
-							chalk.red(String(failed) + " failed") + " / " + 
-							chalk.white(String(count - succeeded - failed) + " skipped"));
-
-					if (evt.options.out) {
-						// Write test results to file
-						return new BbPromise(function(resolve) {
-							junitWriter.save(evt.options.out, function() {
-								SCli.log("Test results written to " + evt.options.out);
-								resolve();
-							});
-						});
-					}
-				}).then(function() {
-					resolve();
-					process.exit(); // FIXME force exit
-				}).catch(function(err) {
-
-					SCli.log("-----------------");
-
-					SCli.log(chalk.bold("Failed to Run Tests - This Error Was Thrown:"));
-					SCli.log(err);
-					evt.data.result.status   = 'error';
-					evt.data.result.response = err.message;
-					return resolve();
-				}).finally(function() {
-					process.env.SERVERLESS_TEST = undefined;
-				});
-			});
-		}
-
-	}
-
-	// Export Plugin Class
-	return ServerlessTestPlugin;
+  // Export Plugin Class
+  return PluginBoilerplate;
 
 };
